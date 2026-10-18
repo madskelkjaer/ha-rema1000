@@ -58,6 +58,21 @@ async def test_add_items(
         {"amount": 1, "product_id": None, "name": "Opvasketabs"},
     ]
 
+    # The same product twice is one line: REMA rejects a second POST with HTTP 422.
+    mock_client.async_add_to_list.reset_mock()
+    await hass.services.async_call(
+        DOMAIN,
+        "add_items",
+        {"items": [{"product_id": 30001}, {"name": "Kage"}, {"product_id": 30001, "amount": 2},
+                   {"name": "kage "}]},
+        blocking=True,
+    )  # fmt: skip
+    calls = [c.kwargs for c in mock_client.async_add_to_list.call_args_list]
+    assert calls == [
+        {"amount": 3, "product_id": 30001, "name": None},
+        {"amount": 2, "product_id": None, "name": "Kage"},
+    ]
+
     await hass.services.async_call(DOMAIN, "add_items", {"items": {"name": "Kaffe"}}, blocking=True)
     assert mock_client.async_add_to_list.call_args.kwargs["name"] == "Kaffe"
 

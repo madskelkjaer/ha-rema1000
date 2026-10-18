@@ -77,7 +77,18 @@ class RemaShoppingListCoordinator(DataUpdateCoordinator[ShoppingList]):
     async def async_add_items(self, items: list[dict[str, Any]]) -> None:
         """Add items ({product_id|name, amount}) to the primary list."""
         shopping_list = await self.client.async_get_primary_list()
+        # One line per product (or free-text name): a new line is not on
+        # shopping_list yet, so a second one would be POSTed again, and REMA
+        # rejects a product that is already on the list (HTTP 422).
+        merged: dict[Any, dict[str, Any]] = {}
         for item in items:
+            name = item.get("name")
+            key = item.get("product_id") or (name.strip().lower() if name else None)
+            if key in merged:
+                merged[key]["amount"] += int(item.get("amount") or 1)
+            else:
+                merged[key] = {**item, "amount": int(item.get("amount") or 1)}
+        for item in merged.values():
             await self.client.async_add_to_list(
                 shopping_list,
                 amount=int(item.get("amount") or 1),
